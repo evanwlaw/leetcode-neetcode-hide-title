@@ -55,82 +55,52 @@
     return !!el.closest('pre, code, textarea, [contenteditable="true"], [class*="editor" i], [class*="cm-" i], [class*="monaco" i]');
   }
 
-  // Walk up while the element is the sole child of its parent, to find a
-  // "tight" wrapper around a lone icon without grabbing unrelated siblings.
-  function tightWrapper(el, maxDepth = 2) {
-    let node = el;
-    for (let i = 0; i < maxDepth; i++) {
-      const parent = node.parentElement;
-      if (!parent || parent.children.length !== 1) break;
-      node = parent;
-    }
-    return node;
-  }
-
   // ---------- Finders ----------
+  // Selectors below are keyed off real markup pulled from live pages, per site.
 
   function findTitle() {
     if (isLeetCode) {
-      const byAttr = document.querySelector('[data-cy="question-title"]');
-      if (byAttr) return [byAttr];
-      const candidate = Array.from(document.querySelectorAll('div, span, a, h1')).find(
-        (e) =>
-          isLeaf(e) &&
-          !isInCodeArea(e) &&
-          /^\d+\.\s*\S/.test(e.textContent.trim()) &&
-          e.textContent.trim().length < 120
-      );
-      return candidate ? [candidate] : [];
+      const link = document.querySelector('[class*="text-title-large" i] a[href^="/problems/"]');
+      if (link) return [link];
     }
     if (isNeetCode) {
-      // Only treat this as a problem page if a difficulty badge is present nearby,
-      // so we don't accidentally blur the site logo/heading on other pages.
-      if (findDifficulty().length === 0) return [];
-      const h1 = document.querySelector('h1');
-      if (h1 && h1.textContent.trim()) return [h1];
-      const h2 = Array.from(document.querySelectorAll('h2')).find((e) => e.textContent.trim());
-      return h2 ? [h2] : [];
+      const h1 = document.querySelector('h1.problem-title');
+      if (h1) return [h1];
     }
     return [];
   }
 
   // "Solved" indicator: LeetCode shows a "Solved" text label plus a green
-  // checkmark icon next to the title; NeetCode shows just the checkmark icon.
+  // checkmark icon in one element (its own text is "Solved"; the icon is a
+  // child <svg> that contributes no text). NeetCode shows just the icon.
   function findSolvedMarker() {
-    const results = [];
-
-    const solvedLabel = Array.from(document.querySelectorAll('div, span, a, p')).find(
-      (e) => isLeaf(e) && !isInCodeArea(e) && /^solved$/i.test(e.textContent.trim())
-    );
-    if (solvedLabel) {
-      results.push(solvedLabel);
-      const parent = solvedLabel.parentElement;
-      if (parent) {
-        parent.querySelectorAll('svg').forEach((svg) => results.push(svg.closest('button, a') || tightWrapper(svg)));
-      }
+    if (isLeetCode) {
+      const el = Array.from(document.querySelectorAll('div, span')).find(
+        (e) => !isInCodeArea(e) && e.textContent.trim() === 'Solved'
+      );
+      return el ? [el] : [];
     }
-
-    const titleEls = findTitle();
-    if (titleEls.length) {
-      const row = titleEls[0].parentElement;
-      if (row) {
-        row.querySelectorAll('svg').forEach((svg) => {
-          if (isInCodeArea(svg)) return;
-          results.push(svg.closest('button, a') || tightWrapper(svg));
-        });
-      }
+    if (isNeetCode) {
+      const icon = document.querySelector('fa-icon.solved-badge-icon');
+      return icon ? [icon] : [];
     }
-
-    return Array.from(new Set(results));
+    return [];
   }
 
   function findDifficulty() {
-    const classHits = Array.from(
-      document.querySelectorAll(
-        '[class*="difficulty-easy" i], [class*="difficulty-medium" i], [class*="difficulty-hard" i]'
-      )
-    );
-    if (classHits.length) return classHits;
+    if (isLeetCode) {
+      const els = Array.from(
+        document.querySelectorAll(
+          '[class*="text-difficulty-easy" i], [class*="text-difficulty-medium" i], [class*="text-difficulty-hard" i]'
+        )
+      );
+      if (els.length) return els;
+    }
+    if (isNeetCode) {
+      const els = Array.from(document.querySelectorAll('span.difficulty-pill'));
+      if (els.length) return els;
+    }
+    // Fallback for either site if the class names above ever change.
     return Array.from(document.querySelectorAll('div, span, a, button')).filter(
       (e) => !isInCodeArea(e) && textIsExact(e, ['Easy', 'Medium', 'Hard'])
     );
@@ -140,24 +110,23 @@
     if (isLeetCode) {
       return Array.from(document.querySelectorAll('a[href^="/tag/"]'));
     }
-    // NeetCode: locate a "Topics" heading and blur the pills/links after it.
-    const heading = Array.from(document.querySelectorAll('h2, h3, h4, span, div')).find(
-      (e) => isLeaf(e) && !isInCodeArea(e) && /^(related\s+)?topics?$/i.test(e.textContent.trim())
-    );
-    if (!heading) return [];
-    const container =
-      (heading.parentElement && heading.parentElement.nextElementSibling) || heading.nextElementSibling;
-    if (!container) return [];
-    const leaves = Array.from(container.querySelectorAll('a, span, div')).filter(
-      (e) => isLeaf(e) && !isInCodeArea(e) && e.textContent.trim() && e.textContent.trim().length <= 40
-    );
-    // Safety valve: a real topic-pill list is short. If this "container" turned
-    // out to be something much bigger (e.g. the whole instructions panel), bail
-    // rather than blurring a wall of unrelated content.
-    return leaves.length <= 15 ? leaves : [];
+    if (isNeetCode) {
+      // The topic names themselves are only rendered after this toggle is
+      // clicked; blur the toggle itself so it doesn't advertise the answer.
+      const toggle = Array.from(document.querySelectorAll('span.secondary-tag')).find(
+        (e) => e.textContent.trim().toLowerCase() === 'topics'
+      );
+      return toggle ? [toggle] : [];
+    }
+    return [];
   }
 
   function findAcceptance() {
+    if (isNeetCode) {
+      const container = document.querySelector('.acceptance-rate');
+      if (container) return [container];
+    }
+
     // "Accepted" and "Acceptance Rate" together, since the raw accepted count
     // combined with the (visible) submissions count would let you back into
     // the rate anyway. Submissions itself is intentionally left alone.
