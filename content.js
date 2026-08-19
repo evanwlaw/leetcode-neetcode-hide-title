@@ -48,14 +48,38 @@
     return isLeaf(el) && values.includes(el.textContent.trim());
   }
 
+  // Never touch code/editor regions (syntax-highlighted example code is often
+  // rendered as many small leaf spans, which can otherwise false-match the
+  // text-based heuristics below).
+  function isInCodeArea(el) {
+    return !!el.closest('pre, code, textarea, [contenteditable="true"], [class*="editor" i], [class*="cm-" i], [class*="monaco" i]');
+  }
+
+  // Walk up while the element is the sole child of its parent, to find a
+  // "tight" wrapper around a lone icon without grabbing unrelated siblings.
+  function tightWrapper(el, maxDepth = 2) {
+    let node = el;
+    for (let i = 0; i < maxDepth; i++) {
+      const parent = node.parentElement;
+      if (!parent || parent.children.length !== 1) break;
+      node = parent;
+    }
+    return node;
+  }
+
   // ---------- Finders ----------
 
   function findTitle() {
     if (isLeetCode) {
       const byAttr = document.querySelector('[data-cy="question-title"]');
       if (byAttr) return [byAttr];
-      const candidate = Array.from(document.querySelectorAll('div, span, a, h1'))
-        .find((e) => isLeaf(e) && /^\d+\.\s*\S/.test(e.textContent.trim()) && e.textContent.trim().length < 120);
+      const candidate = Array.from(document.querySelectorAll('div, span, a, h1')).find(
+        (e) =>
+          isLeaf(e) &&
+          !isInCodeArea(e) &&
+          /^\d+\.\s*\S/.test(e.textContent.trim()) &&
+          e.textContent.trim().length < 120
+      );
       return candidate ? [candidate] : [];
     }
     if (isNeetCode) {
@@ -70,6 +94,36 @@
     return [];
   }
 
+  // "Solved" indicator: LeetCode shows a "Solved" text label plus a green
+  // checkmark icon next to the title; NeetCode shows just the checkmark icon.
+  function findSolvedMarker() {
+    const results = [];
+
+    const solvedLabel = Array.from(document.querySelectorAll('div, span, a, p')).find(
+      (e) => isLeaf(e) && !isInCodeArea(e) && /^solved$/i.test(e.textContent.trim())
+    );
+    if (solvedLabel) {
+      results.push(solvedLabel);
+      const parent = solvedLabel.parentElement;
+      if (parent) {
+        parent.querySelectorAll('svg').forEach((svg) => results.push(svg.closest('button, a') || tightWrapper(svg)));
+      }
+    }
+
+    const titleEls = findTitle();
+    if (titleEls.length) {
+      const row = titleEls[0].parentElement;
+      if (row) {
+        row.querySelectorAll('svg').forEach((svg) => {
+          if (isInCodeArea(svg)) return;
+          results.push(svg.closest('button, a') || tightWrapper(svg));
+        });
+      }
+    }
+
+    return Array.from(new Set(results));
+  }
+
   function findDifficulty() {
     const classHits = Array.from(
       document.querySelectorAll(
@@ -77,8 +131,8 @@
       )
     );
     if (classHits.length) return classHits;
-    return Array.from(document.querySelectorAll('div, span, a, button')).filter((e) =>
-      textIsExact(e, ['Easy', 'Medium', 'Hard'])
+    return Array.from(document.querySelectorAll('div, span, a, button')).filter(
+      (e) => !isInCodeArea(e) && textIsExact(e, ['Easy', 'Medium', 'Hard'])
     );
   }
 
@@ -88,23 +142,30 @@
     }
     // NeetCode: locate a "Topics" heading and blur the pills/links after it.
     const heading = Array.from(document.querySelectorAll('h2, h3, h4, span, div')).find(
-      (e) => isLeaf(e) && /^(related\s+)?topics?$/i.test(e.textContent.trim())
+      (e) => isLeaf(e) && !isInCodeArea(e) && /^(related\s+)?topics?$/i.test(e.textContent.trim())
     );
     if (!heading) return [];
     const container =
       (heading.parentElement && heading.parentElement.nextElementSibling) || heading.nextElementSibling;
     if (!container) return [];
-    return Array.from(container.querySelectorAll('a, span, div')).filter((e) => isLeaf(e) && e.textContent.trim());
+    const leaves = Array.from(container.querySelectorAll('a, span, div')).filter(
+      (e) => isLeaf(e) && !isInCodeArea(e) && e.textContent.trim() && e.textContent.trim().length <= 40
+    );
+    // Safety valve: a real topic-pill list is short. If this "container" turned
+    // out to be something much bigger (e.g. the whole instructions panel), bail
+    // rather than blurring a wall of unrelated content.
+    return leaves.length <= 15 ? leaves : [];
   }
 
   function findAcceptance() {
-    // Covers the "Accepted" / "Submissions" / "Acceptance Rate" trio together,
-    // since the raw counts let you back into the rate anyway.
-    const LABEL_RE = /^(accepted|submissions|acceptance(\s*rate)?)$/i;
+    // "Accepted" and "Acceptance Rate" together, since the raw accepted count
+    // combined with the (visible) submissions count would let you back into
+    // the rate anyway. Submissions itself is intentionally left alone.
+    const LABEL_RE = /^(accepted|acceptance(\s*rate)?)$/i;
     const results = new Set();
 
     Array.from(document.querySelectorAll('div, span, p, td, th, li'))
-      .filter((e) => isLeaf(e) && LABEL_RE.test(e.textContent.trim()))
+      .filter((e) => isLeaf(e) && !isInCodeArea(e) && LABEL_RE.test(e.textContent.trim()))
       .forEach((label) => {
         results.add(label);
         const valueContainers = [
@@ -116,14 +177,21 @@
           if (isLeaf(container)) {
             results.add(container);
           } else {
-            Array.from(container.querySelectorAll('*')).filter(isLeaf).forEach((leaf) => results.add(leaf));
+            Array.from(container.querySelectorAll('*'))
+              .filter((e) => isLeaf(e) && !isInCodeArea(e))
+              .forEach((leaf) => results.add(leaf));
           }
         });
       });
 
     // Single element combining label + value, e.g. "Acceptance Rate 56.3%"
     Array.from(document.querySelectorAll('div, span, p'))
-      .filter((e) => isLeaf(e) && /(accepted|submissions|acceptance\s*rate)[^a-z0-9]{0,20}[\d,.]+\s*%?/i.test(e.textContent))
+      .filter(
+        (e) =>
+          isLeaf(e) &&
+          !isInCodeArea(e) &&
+          /(accepted|acceptance\s*rate)[^a-z0-9]{0,20}[\d,.]+\s*%?/i.test(e.textContent)
+      )
       .forEach((e) => results.add(e));
 
     return Array.from(results);
@@ -146,7 +214,7 @@
   }
 
   function apply() {
-    applyCategory('title', settings.hideTitle, findTitle);
+    applyCategory('title', settings.hideTitle, () => [...findTitle(), ...findSolvedMarker()]);
     applyCategory('difficulty', settings.hideDifficulty, findDifficulty);
     applyCategory('topics', settings.hideTopics, findTopics);
     applyCategory('acceptance', settings.hideAcceptance, findAcceptance);

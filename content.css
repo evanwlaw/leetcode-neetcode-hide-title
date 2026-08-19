@@ -9,16 +9,25 @@
 }
 
 /* Opaque scrim behind the blur so colored badges/backgrounds (e.g. a green
-   "Easy" pill) can't bleed through and give the answer away. */
+   "Easy" pill) can't bleed through and give the answer away. The bleed
+   (bigger than the element itself) lets neighboring blurred items - like a
+   difficulty badge sitting right next to a solved checkmark - merge into one
+   continuous patch instead of showing as separate blocks with gaps. */
 .lnht-blur::before {
   content: '';
   position: absolute;
-  inset: -3px;
+  inset: -4px -6px;
   background: rgba(122, 122, 132, 0.96);
-  border-radius: inherit;
+  border-radius: 3px;
   z-index: 1;
   pointer-events: none;
   transition: opacity 0.15s ease;
+}
+
+/* ::before generated content isn't reliably supported on <svg> itself, so
+   icons (e.g. a bare checkmark on NeetCode) fall back to opacity + blur. */
+svg.lnht-blur {
+  opacity: 0.05 !important;
 }
 
 .lnht-blur:hover,
@@ -26,6 +35,11 @@
   color: inherit !important;
   filter: none !important;
   -webkit-filter: none !important;
+}
+
+svg.lnht-blur:hover,
+svg.lnht-blur.lnht-revealed {
+  opacity: 1 !important;
 }
 
 .lnht-blur:hover::before,
