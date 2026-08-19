@@ -50,9 +50,15 @@
 
   // Never touch code/editor regions (syntax-highlighted example code is often
   // rendered as many small leaf spans, which can otherwise false-match the
-  // text-based heuristics below).
+  // text-based heuristics below). Deliberately specific known editor-widget
+  // selectors rather than a generic `[class*="editor"]` substring match -
+  // that was too broad and matched the whole split-pane layout wrapper
+  // (which incidentally has "editor" in its class name), silently excluding
+  // the Solved badge and Accepted/Acceptance Rate stats from every match.
   function isInCodeArea(el) {
-    return !!el.closest('pre, code, textarea, [contenteditable="true"], [class*="editor" i], [class*="cm-" i], [class*="monaco" i]');
+    return !!el.closest(
+      'pre, code, textarea, [contenteditable="true"], .monaco-editor, .view-lines, .CodeMirror, .cm-editor, .cm-content, [data-mode-id]'
+    );
   }
 
   // ---------- Finders ----------
@@ -75,10 +81,9 @@
   // child <svg> that contributes no text). NeetCode shows just the icon.
   function findSolvedMarker() {
     if (isLeetCode) {
-      const el = Array.from(document.querySelectorAll('div, span')).find(
+      return Array.from(document.querySelectorAll('div, span')).filter(
         (e) => !isInCodeArea(e) && e.textContent.trim() === 'Solved'
       );
-      return el ? [el] : [];
     }
     if (isNeetCode) {
       const icon = document.querySelector('fa-icon.solved-badge-icon');
