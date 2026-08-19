@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Hide LeetCode & NeetCode Spoilers",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Blur the problem title, difficulty, topics, and acceptance rate on LeetCode and NeetCode while you practice. Hover or click a blurred item to reveal it.",
   "permissions": ["storage", "activeTab"],
   "host_permissions": [

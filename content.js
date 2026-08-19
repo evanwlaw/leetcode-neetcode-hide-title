@@ -123,9 +123,28 @@
     );
   }
 
+  // LeetCode's "Topics" and "Companies" pills are just toggles - their own
+  // text includes an icon child (so a plain leaf-text match misses them),
+  // and they're siblings of the difficulty pill in one row. Scoping to that
+  // row's direct children avoids matching an unrelated "Topics" link
+  // elsewhere on the page (e.g. site nav).
+  function findLcMetaPills() {
+    const difficultyEl = document.querySelector(
+      '[class*="text-difficulty-easy" i], [class*="text-difficulty-medium" i], [class*="text-difficulty-hard" i]'
+    );
+    const row = difficultyEl && difficultyEl.parentElement;
+    if (!row) return [];
+    return Array.from(row.children).filter((child) => {
+      const text = child.textContent.trim();
+      return text === 'Topics' || text === 'Companies';
+    });
+  }
+
   function findTopics() {
     if (isLeetCode) {
-      return Array.from(document.querySelectorAll('a[href^="/tag/"]'));
+      const results = new Set(document.querySelectorAll('a[href^="/tag/"]'));
+      findLcMetaPills().forEach((el) => results.add(el));
+      return Array.from(results);
     }
     if (isNeetCode) {
       // The topic names themselves are only rendered after this toggle is
