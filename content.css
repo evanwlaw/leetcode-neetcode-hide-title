@@ -1,0 +1,13 @@
+.lnht-blur {
+  filter: blur(8px) !important;
+  -webkit-filter: blur(8px) !important;
+  transition: filter 0.15s ease !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+.lnht-blur:hover,
+.lnht-blur.lnht-revealed {
+  filter: none !important;
+  -webkit-filter: none !important;
+}
