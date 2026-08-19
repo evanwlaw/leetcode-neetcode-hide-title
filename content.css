@@ -1,13 +1,34 @@
 .lnht-blur {
-  filter: blur(8px) !important;
-  -webkit-filter: blur(8px) !important;
-  transition: filter 0.15s ease !important;
+  position: relative !important;
+  color: transparent !important;
+  filter: blur(6px) !important;
+  -webkit-filter: blur(6px) !important;
+  transition: filter 0.15s ease, color 0.15s ease !important;
   cursor: pointer !important;
   user-select: none !important;
 }
 
+/* Opaque scrim behind the blur so colored badges/backgrounds (e.g. a green
+   "Easy" pill) can't bleed through and give the answer away. */
+.lnht-blur::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  background: rgba(122, 122, 132, 0.96);
+  border-radius: inherit;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
 .lnht-blur:hover,
 .lnht-blur.lnht-revealed {
+  color: inherit !important;
   filter: none !important;
   -webkit-filter: none !important;
+}
+
+.lnht-blur:hover::before,
+.lnht-blur.lnht-revealed::before {
+  opacity: 0;
 }

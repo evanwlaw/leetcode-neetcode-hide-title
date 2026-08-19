@@ -98,19 +98,35 @@
   }
 
   function findAcceptance() {
-    const results = [];
-    const label = Array.from(document.querySelectorAll('div, span, p')).find(
-      (e) => isLeaf(e) && /^acceptance(\s*rate)?$/i.test(e.textContent.trim())
-    );
-    if (label) {
-      results.push(label);
-      const valueSibling = label.parentElement && label.parentElement.nextElementSibling;
-      if (valueSibling) results.push(valueSibling);
-    }
+    // Covers the "Accepted" / "Submissions" / "Acceptance Rate" trio together,
+    // since the raw counts let you back into the rate anyway.
+    const LABEL_RE = /^(accepted|submissions|acceptance(\s*rate)?)$/i;
+    const results = new Set();
+
+    Array.from(document.querySelectorAll('div, span, p, td, th, li'))
+      .filter((e) => isLeaf(e) && LABEL_RE.test(e.textContent.trim()))
+      .forEach((label) => {
+        results.add(label);
+        const valueContainers = [
+          label.nextElementSibling,
+          label.previousElementSibling,
+          label.parentElement && label.parentElement.nextElementSibling,
+        ].filter(Boolean);
+        valueContainers.forEach((container) => {
+          if (isLeaf(container)) {
+            results.add(container);
+          } else {
+            Array.from(container.querySelectorAll('*')).filter(isLeaf).forEach((leaf) => results.add(leaf));
+          }
+        });
+      });
+
+    // Single element combining label + value, e.g. "Acceptance Rate 56.3%"
     Array.from(document.querySelectorAll('div, span, p'))
-      .filter((e) => isLeaf(e) && /acceptance\s*rate[^a-z0-9]{0,10}\d+(\.\d+)?%/i.test(e.textContent))
-      .forEach((e) => results.push(e));
-    return results;
+      .filter((e) => isLeaf(e) && /(accepted|submissions|acceptance\s*rate)[^a-z0-9]{0,20}[\d,.]+\s*%?/i.test(e.textContent))
+      .forEach((e) => results.add(e));
+
+    return Array.from(results);
   }
 
   // ---------- Apply ----------
