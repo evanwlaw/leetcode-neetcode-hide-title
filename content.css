@@ -46,3 +46,10 @@ svg.lnht-blur.lnht-revealed {
 .lnht-blur.lnht-revealed::before {
   opacity: 0;
 }
+
+/* Solved marker: fully removed, not blurred. A blurred badge still implies
+   "you've solved this before," which is itself a spoiler - only true
+   invisibility (indistinguishable from a never-solved problem) hides that. */
+.lnht-hide {
+  display: none !important;
+}

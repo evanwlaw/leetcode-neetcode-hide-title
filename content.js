@@ -14,10 +14,22 @@
   let settings = { ...DEFAULTS };
 
   const HIDDEN_CLASS = 'lnht-blur';
+  const REMOVED_CLASS = 'lnht-hide';
+
+  // The "solved" marker is fully removed rather than blurred: a blurred item
+  // still implies "you've done this before," which is itself a spoiler.
+  const HARD_HIDE_CATEGORIES = new Set(['solved']);
 
   function tagHidden(el, category) {
     if (!el || el.nodeType !== 1) return;
+    if (HARD_HIDE_CATEGORIES.has(category)) {
+      el.classList.add(REMOVED_CLASS);
+      el.classList.remove(HIDDEN_CLASS, 'lnht-revealed');
+      el.setAttribute('data-lnht', category);
+      return;
+    }
     el.classList.add(HIDDEN_CLASS);
+    el.classList.remove(REMOVED_CLASS);
     el.setAttribute('data-lnht', category);
     if (!el.dataset.lnhtBound) {
       el.dataset.lnhtBound = '1';
@@ -26,7 +38,7 @@
   }
 
   function untag(el) {
-    el.classList.remove(HIDDEN_CLASS, 'lnht-revealed');
+    el.classList.remove(HIDDEN_CLASS, REMOVED_CLASS, 'lnht-revealed');
     el.removeAttribute('data-lnht');
   }
 
@@ -188,7 +200,8 @@
   }
 
   function apply() {
-    applyCategory('title', settings.hideTitle, () => [...findTitle(), ...findSolvedMarker()]);
+    applyCategory('title', settings.hideTitle, findTitle);
+    applyCategory('solved', settings.hideTitle, findSolvedMarker);
     applyCategory('difficulty', settings.hideDifficulty, findDifficulty);
     applyCategory('topics', settings.hideTopics, findTopics);
     applyCategory('acceptance', settings.hideAcceptance, findAcceptance);
